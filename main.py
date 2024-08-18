@@ -80,7 +80,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             "To run the bot, click the button 👇🏻"
         )
         keyboard = [
-            [InlineKeyboardButton("Get KeyGen 🔑", url="https://twekeygennn.static.domains/")]
+            [InlineKeyboardButton("Get KeyGen 🔑", url="https://t.me/TWEHamsterGenBot/TWEKeyGen")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(success_message, reply_markup=reply_markup)
