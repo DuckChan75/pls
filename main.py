@@ -147,13 +147,40 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text("Please provide a message to broadcast.")
         return
 
+    successful = 0
+    failed = 0
+    users_to_remove = []
+
     for user_id in users:
         try:
             await context.bot.send_message(chat_id=user_id, text=message)
+            successful += 1
         except Exception as e:
             logger.warning(f"Failed to send message to user {user_id}: {e}")
+            failed += 1
+            users_to_remove.append(user_id)
 
-    await update.message.reply_text("Broadcast message sent to all users.")
+    # Remove users who blocked the bot
+    if users_to_remove:
+        for user_id in users_to_remove:
+            users.remove(user_id)
+
+        # Save the updated users list
+        try:
+            with open(USERS_FILE, 'w') as file:
+                json.dump(users, file)
+            logger.info(f"Removed {len(users_to_remove)} users who blocked the bot.")
+        except IOError as e:
+            logger.error(f"Failed to update {USERS_FILE} after removing users: {e}")
+
+    # Send feedback message to the admin
+    feedback_message = (
+        f"Broadcast message sent.\n"
+        f"Successful: {successful}\n"
+        f"Failed: {failed}\n"
+        f"Users removed: {len(users_to_remove)}"
+    )
+    await update.message.reply_text(feedback_message)
 
 def main() -> None:
     """Start the bot."""
