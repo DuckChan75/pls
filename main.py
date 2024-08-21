@@ -77,10 +77,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if len(joined_channels) == len(CHANNELS):
         success_message = (
             "You have successfully joined all required channels.\n"
-            "To run the bot, click the button 👇🏻"
+            "To run the bot, click one of the buttons below 👇🏻\n"
+            "pls choose the servers randomly 👍🏻"
         )
         keyboard = [
-            [InlineKeyboardButton("Get KeyGen 🔑", url="https://t.me/TWEHamsterGenBot/TWEKeyGen")]
+            [InlineKeyboardButton("Server 1 🔑", url="https://t.me/TWEHamsterGenBot/TWEKeyGen")],
+            [InlineKeyboardButton("Server 2 🔑", url="https://t.me/HamsterKombat_keys_generator_bot/HamsterKeyGen2")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(success_message, reply_markup=reply_markup)
@@ -96,39 +98,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(join_message, reply_markup=reply_markup)
-
-async def get(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle the /get command."""
-    user_id = update.effective_user.id
-    save_user(user_id)
-
-    joined_channels = []
-    for channel in CHANNELS:
-        try:
-            chat_member = await context.bot.get_chat_member(channel, user_id)
-            if chat_member.status in ['member', 'creator', 'administrator']:
-                joined_channels.append(channel)
-        except Exception as e:
-            logger.warning(f"Could not access channel {channel} for user {user_id}: {e}")
-            await update.message.reply_text(
-                f"Could not verify membership in {channel}. "
-                "Please ensure the bot has the correct permissions."
-            )
-            return
-
-    if len(joined_channels) == len(CHANNELS):
-        keyboard = [
-            [InlineKeyboardButton("🔑 Get KeyGen", url="https://t.me/TWEHamsterGenBot/TWEKeyGen")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text('Click the button below:', reply_markup=reply_markup)
-    else:
-        keyboard = [
-            [InlineKeyboardButton("TWE | News 🤝🏻", url="https://t.me/TWENewss")],
-            [InlineKeyboardButton("Crypto Dragon 🐉", url="https://t.me/crypto_Dragonz")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text("You must join these 2 channels to use the bot:", reply_markup=reply_markup)
 
 async def count(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle the /count command."""
@@ -187,7 +156,6 @@ def main() -> None:
     application = ApplicationBuilder().token(BOT_TOKEN).build()
 
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("get", get))
     application.add_handler(CommandHandler("count", count))
     application.add_handler(CommandHandler("broadcast", broadcast))
 
