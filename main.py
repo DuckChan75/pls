@@ -2,7 +2,10 @@ import logging
 import json
 import os
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler, MessageHandler, filters, 
+    ContextTypes, ConversationHandler
+)
 
 # Enable logging
 logging.basicConfig(
@@ -21,6 +24,9 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 # Path to the users file
 USERS_FILE = 'users.json'
 
+# Conversation states
+BROADCAST_MESSAGE = 1
+
 def load_users():
     """Load users from the JSON file."""
     if not os.path.exists(USERS_FILE):
@@ -29,23 +35,26 @@ def load_users():
 
     try:
         with open(USERS_FILE, 'r') as file:
-            data = json.load(file)
-            return list(data) if isinstance(data, list) else []
+            return json.load(file)
     except (json.JSONDecodeError, IOError) as e:
         logger.error(f"Error loading users from {USERS_FILE}: {e}")
         return []
+
+def save_users(users):
+    """Save users to the JSON file."""
+    try:
+        with open(USERS_FILE, 'w') as file:
+            json.dump(users, file)
+        logger.info(f"Users file updated successfully.")
+    except IOError as e:
+        logger.error(f"Failed to write to {USERS_FILE}: {e}")
 
 def save_user(user_id):
     """Save a user ID to the JSON file."""
     users = load_users()
     if user_id not in users:
         users.append(user_id)
-        try:
-            with open(USERS_FILE, 'w') as file:
-                json.dump(users, file)
-            logger.info(f"User {user_id} saved successfully.")
-        except IOError as e:
-            logger.error(f"Failed to write to {USERS_FILE}: {e}")
+        save_users(users)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle the /start command."""
@@ -104,17 +113,19 @@ async def count(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     users = load_users()
     await update.message.reply_text(f"There are currently {len(users)} users in the bot.")
 
-async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle the /broadcast command."""
+async def broadcast_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Start the broadcast process by asking the admin for the message."""
     if update.effective_user.id not in ADMIN_IDS:
         await update.message.reply_text("You are not authorized to use this command.")
-        return
+        return ConversationHandler.END
 
+    await update.message.reply_text("Please provide the message you would like to broadcast.")
+    return BROADCAST_MESSAGE
+
+async def broadcast_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle the message input and broadcast it to all users."""
     users = load_users()
-    message = ' '.join(context.args)
-    if not message:
-        await update.message.reply_text("Please provide a message to broadcast.")
-        return
+    message = update.message.text
 
     successful = 0
     failed = 0
@@ -131,16 +142,9 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     # Remove users who blocked the bot
     if users_to_remove:
-        for user_id in users_to_remove:
-            users.remove(user_id)
-
-        # Save the updated users list
-        try:
-            with open(USERS_FILE, 'w') as file:
-                json.dump(users, file)
-            logger.info(f"Removed {len(users_to_remove)} users who blocked the bot.")
-        except IOError as e:
-            logger.error(f"Failed to update {USERS_FILE} after removing users: {e}")
+        users = [user_id for user_id in users if user_id not in users_to_remove]
+        save_users(users)
+        logger.info(f"Removed {len(users_to_remove)} users who blocked the bot.")
 
     # Send feedback message to the admin
     feedback_message = (
@@ -151,13 +155,24 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
     await update.message.reply_text(feedback_message)
 
+    return ConversationHandler.END
+
 def main() -> None:
     """Start the bot."""
     application = ApplicationBuilder().token(BOT_TOKEN).build()
 
+    # Set up the conversation handler for broadcasting
+    broadcast_handler = ConversationHandler(
+        entry_points=[CommandHandler("broadcast", broadcast_start)],
+        states={
+            BROADCAST_MESSAGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, broadcast_message)],
+        },
+        fallbacks=[],
+    )
+
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("count", count))
-    application.add_handler(CommandHandler("broadcast", broadcast))
+    application.add_handler(broadcast_handler)
 
     application.run_polling()
 
