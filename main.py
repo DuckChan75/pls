@@ -130,15 +130,11 @@ async def broadcast_message(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     successful = 0
     failed = 0
     users_to_remove = []
-    sent_to = set()  # Keep track of users we've already sent to
 
     for user_id in users:
-        if user_id in sent_to:
-            continue  # Skip if we've already sent to this user
         try:
             await context.bot.send_message(chat_id=user_id, text=message)
             successful += 1
-            sent_to.add(user_id)
         except Exception as e:
             logger.warning(f"Failed to send message to user {user_id}: {e}")
             failed += 1
@@ -152,12 +148,15 @@ async def broadcast_message(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
     # Send feedback message to the admin
     feedback_message = (
-        f"Broadcast message sent.\n"
+        f"Broadcast complete.\n"
         f"Successful: {successful}\n"
         f"Failed: {failed}\n"
         f"Users removed: {len(users_to_remove)}"
     )
     await update.message.reply_text(feedback_message)
+
+    # Send confirmation message in English
+    await update.message.reply_text("Message sent successfully.")
 
     return ConversationHandler.END
 
