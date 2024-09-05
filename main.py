@@ -44,7 +44,7 @@ def save_users(users):
     """Save users to the JSON file."""
     try:
         with open(USERS_FILE, 'w') as file:
-            json.dump(users, file)
+            json.dump(list(set(users)), file)  # Remove duplicates
         logger.info(f"Users file updated successfully.")
     except IOError as e:
         logger.error(f"Failed to write to {USERS_FILE}: {e}")
@@ -130,11 +130,15 @@ async def broadcast_message(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     successful = 0
     failed = 0
     users_to_remove = []
+    sent_to = set()  # Keep track of users we've already sent to
 
     for user_id in users:
+        if user_id in sent_to:
+            continue  # Skip if we've already sent to this user
         try:
             await context.bot.send_message(chat_id=user_id, text=message)
             successful += 1
+            sent_to.add(user_id)
         except Exception as e:
             logger.warning(f"Failed to send message to user {user_id}: {e}")
             failed += 1
