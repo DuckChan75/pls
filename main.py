@@ -7,47 +7,45 @@ from telegram.ext import (
     ContextTypes, ConversationHandler
 )
 
+# Configure logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
+# Configuration variables
 CHANNELS = ['@crypto_Dragonz', '@TWENewss']
 ADMIN_IDS = {5226868404, 800092886}
-
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-
 USERS_FILE = 'users.json'
 
 BROADCAST_MESSAGE = 1
 
+# Utility functions
 def load_users():
-    if not os.path.exists(USERS_FILE):
-        logger.info(f"{USERS_FILE} not found, creating a new one.")
-        return []
-
     try:
         with open(USERS_FILE, 'r') as file:
-            return json.load(file)
+            return set(json.load(file))
     except (json.JSONDecodeError, IOError) as e:
         logger.error(f"Error loading users from {USERS_FILE}: {e}")
-        return []
+        return set()
 
 def save_users(users):
     try:
         with open(USERS_FILE, 'w') as file:
-            json.dump(list(set(users)), file)
-        logger.info(f"Users file updated successfully.")
+            json.dump(list(users), file)
+        logger.info("Users file updated successfully.")
     except IOError as e:
         logger.error(f"Failed to write to {USERS_FILE}: {e}")
 
 def save_user(user_id):
     users = load_users()
     if user_id not in users:
-        users.append(user_id)
+        users.add(user_id)
         save_users(users)
 
+# Command handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
     username = update.effective_user.username
@@ -78,7 +76,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         success_message = (
             "You have successfully joined all required channels.\n"
             "To run the bot, click one of the buttons below 👇🏻\n"
-            "pls choose the servers randomly 👍🏻"
+            "Please choose the servers randomly 👍🏻"
         )
         keyboard = [
             [InlineKeyboardButton("Server 1 🔑", url="https://t.me/TWEHamsterGenBot/TWEKeyGen")],
@@ -121,10 +119,7 @@ async def broadcast_message(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
     for user_id in users:
         try:
-            if user_id in ADMIN_IDS:
-                await context.bot.send_message(chat_id=user_id, text="A broadcast message has been sent to all users.")
-            else:
-                await context.bot.send_message(chat_id=user_id, text=message)
+            await context.bot.send_message(chat_id=user_id, text=message)
             successful += 1
         except Exception as e:
             logger.warning(f"Failed to send message to user {user_id}: {e}")
@@ -132,7 +127,7 @@ async def broadcast_message(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             users_to_remove.append(user_id)
 
     if users_to_remove:
-        users = [user_id for user_id in users if user_id not in users_to_remove]
+        users.difference_update(users_to_remove)
         save_users(users)
         logger.info(f"Removed {len(users_to_remove)} users who blocked the bot.")
 
@@ -144,13 +139,17 @@ async def broadcast_message(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     )
     await update.message.reply_text(feedback_message)
 
-    await update.message.reply_text("Message sent successfully.")
-
     return ConversationHandler.END
 
+# Main function
 def main() -> None:
+    if BOT_TOKEN is None:
+        logger.error("Bot token not set! Please set the BOT_TOKEN environment variable.")
+        return
+
     application = ApplicationBuilder().token(BOT_TOKEN).build()
 
+    # Command handlers
     broadcast_handler = ConversationHandler(
         entry_points=[CommandHandler("broadcast", broadcast_start)],
         states={
@@ -166,7 +165,4 @@ def main() -> None:
     application.run_polling()
 
 if __name__ == '__main__':
-    if BOT_TOKEN is None:
-        logger.error("Bot token not set! Please set the BOT_TOKEN environment variable.")
-    else:
-        main()
+    main()
